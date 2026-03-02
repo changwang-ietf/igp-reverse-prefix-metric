@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This template is for creating an Internet Draft using xml2rfc,
+    which is available here: http://xml.resource.org. -->
+<rfc submissionType="IETF" category="std" docName="draft-li-lsr-igp-reverse-prefix-metric-04"
+ipr="trust200902" consensus="true" updates="" xmlns:xi="http://www.w3.org/2001/XInclude">
+  <!-- category values: std, bcp, info, exp, and historic
+    ipr values: full3667, noModification3667, noDerivatives3667
+    you can add the attributes updates="NNNN" and obsoletes="NNNN"
+    they will automatically be output with "(if approved)" -->
+
+  <!-- ***** FRONT MATTER ***** -->
+
+  <front>
+
+    <title abbrev="IGP Reverse Prefix Metric">IGP Reverse Prefix Metric</title>
+
+    <!-- add 'role="editor"' below for the editors if appropriate -->
+
+    <!-- Another author who claims to be an editor -->
+
+    <author fullname="Dan Li" initials="D."
+            surname="Li">
+      <organization>Tsinghua University</organization>
+      <address>
+        <postal>
+          <!-- Reorder these if your country does things differently -->
+
+          <city>Beijing</city>
+
+          <country>China</country>
+        </postal>
+
+        <email>tolidan@tsinghua.edu.cn</email>
+
+        <!-- uri and facsimile elements may also be added -->
+      </address>
+    </author>
+    <author fullname="Changwang Lin" initials="C."
+            surname="Lin">
+      <organization>New H3C Technologies</organization>
+      <address>
+        <postal>
+          <!-- Reorder these if your country does things differently -->
+
+          <city>Beijing</city>
+
+          <country>China</country>
+        </postal>
+
+        <email>linchangwang.04414@h3c.com</email>
+
+        <!-- uri and facsimile elements may also be added -->
+      </address>
+    </author>
+    <author fullname="Acee Lindem" initials="A."
+            surname="Lindem">
+      <organization>Arrcus, Inc.</organization>
+      <address>
+        <postal>
+          <!-- Reorder these if your country does things differently -->
+
+          <country>United States of America</country>
+        </postal>
+
+        <email>acee.ietf@gmail.com</email>
+
+        <!-- uri and facsimile elements may also be added -->
+      </address>
+    </author>
+    <author fullname="Libin Liu" initials="L."
+            surname="Liu">
+      <organization>Zhongguancun Laboratory</organization>
+      <address>
+        <postal>
+          <!-- Reorder these if your country does things differently -->
+
+          <city>Beijing</city>
+
+          <country>China</country>
+        </postal>
+
+        <email>liulb@zgclab.edu.cn</email>
+
+        <!-- uri and facsimile elements may also be added -->
+      </address>
+    </author>
+    <author fullname="Xueyan Song" initials="X."
+            surname="Song">
+      <organization>ZTE Corporation</organization>
+      <address>
+        <postal>
+          <!-- Reorder these if your country does things differently -->
+
+          <country>China</country>
+        </postal>
+
+        <email>song.xueyan2@zte.com.cn</email>
+
+        <!-- uri and facsimile elements may also be added -->
+      </address>
+    </author>
+
+    <date year="2026" />
+
+    <!-- Meta-data Declarations -->
+
+    <area>General</area>
+
+    <workgroup>LSR Working Group</workgroup>
+
+    <keyword>IGP</keyword>
+    <keyword>reverse</keyword>
+    <keyword>metric</keyword>
+
+    <abstract>
+    <t>
+      This document defines a method for calculating reverse paths by advertising
+      reverse prefix costs. This method aims to solve the problem of strict RPF
+      (Reverse Path Forwarding) check failure caused by mismatched bidirectional
+      path costs in multi-area IGP scenarios.
+    </t>
+    </abstract>
+  </front>
+
+  <middle>
+
+<section anchor="Introduction" title="Introduction">
+<t>
+	The process of strict RPF (Reverse Path Forwarding) checks involves verifying
+  that a packet is received on the interface that matches the router's reverse
+  path to the source address. If the cost to the source is inconsistent between
+  the forward and reverse directions, the strict RPF check fails, resulting in
+  the packet being discarded.
+</t>
+<t>
+  Another scenario involves running IGP multi-topology, where multicast traffic
+  is usually situated within a separate topology. In this case, multicast also
+  requires reverse path calculation.
+</t>
+<t>
+  This document defines a method for calculating reverse paths by advertising
+  reverse prefix costs. This method aims to solve the problem of strict RPF check
+  failure caused by mismatched bidirectional path costs in multi-area IGP scenarios.
+</t>
+<section anchor="Requirements Language" title="Requirements Language">
+  <t>
+    The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+    NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+    "MAY", and "OPTIONAL" in this document are to be interpreted as
+    described in BCP 14 <xref target="RFC2119"/> <xref
+    target="RFC8174"/> when, and only when, they appear in all
+    capitals, as shown here.
+  </t>
+</section>
+</section>
+
+<section anchor="Usecase" title="Usecase">
+<t>
+  The strict RPF check process involves verifying that a packet is received on
+  the interface that matches the router's reverse path to the source. If the cost
+  between the forward and reverse path to the source is inconsistent, the strict
+  RPF check will fail, resulting in the packet being discarded.
+</t>
+<t>
+  Therefore, when performing strict RPF checks, in cases where forward and reverse
+  path costs are inconsistent, it is necessary to calculate the optimal path based
+  on reverse path costs. This allows strict RPF checks to be conducted using the
+  reverse optimal path.
+</t>
+<t>
+  Another scenario involves running multicast in an IGP multi-topology scenarios,
+  where the cost of the multicast topology differs from that of the base topology.
+  In multi-area scenarios, when the multicast topology requires reverse path calculation,
+  the reverse cost between areas must also be considered.
+</t>
+<t>
+  Typically, IGP can advertise link information through the link-state database,
+  which provides knowledge of both forward and reverse path costs within the domain.
+  However, in multi-area scenarios, the situation is different. The following describes
+  the situation in multi-area scenarios in detail:
+</t>
+<t>
+  In large-scale networks, an AS may be divided into different areas to avoid the
+  problems caused by too many nodes. As shown in the following figure, an AS divided
+  into two areas, each router is connected to the corresponding subnet, R1 is connected
+  to P1, and so on, and R7 is connected to P7.
+</t>
+<t>
+  Taking OSPFv2 <xref target="RFC2328"/> as an example, R4 and R5, as ABRs, will convert the router LSA (type-1)
+  of R6 and R7 in Area1 into network Summary LSA (type-3) and advertise it to the routers
+  in Area0. Area0 to Area1 are also processed in the same way.
+</t>
+<t>
+  The type-3 route received by R3 from R4 will include the subnet of R6, with an originator
+  of R4 and a cost of 10. According to the method described in section 4, R3 will calculate
+  the valid incoming interface of P6 as intf1.
+</t>
+<t>
+  If the cost of the two directions of the link between R4 and R6 is different for some
+  reason, for example, the cost from R4 to R6 is 10, but the cost in the reverse direction
+  is 100, which will cause the packet sent by R6 to arrive at R3 from intf2 actually.
+  But the type-3 route advertised by R4 to R3 has only one-way cost from R4 to R6,
+  which cannot reflect the real situation.
+</t>
+<t><figure>
+<artwork align="center" name="Figure 1"><![CDATA[
+                                        Area1                
+      Area0                       +-------------------------+
++-------------------------------+ |                         |
+|                               | *      cost 100(<-)       *
+*                    intf1    +-+-+-+(->)cost 10  +-----+   |
+|   +----+            +-------+  R4 +-------------+  R6 |   *
+*   | R1 +---------+  |       +-+-+-+             +--+--+   |
+|   +----+        ++--++        | |          cost20  |      *
+*                 | R3 |        * *          (<->)   |      |
+|                 ++--++        | |                  |      *
+*   +----+         |  |       +-+-+-+(->)cost 20  +--+--+   |
+|   | R2 +---------+  +-------+  R5 +-------------+  R7 |   *
+*   +----+           intf2    +-+-+-+ cost 30(<-) +-----+   |
+|                               | |                         *
++-------------------------------+ +-------------------------+ 
+
+          Figure 1: example topology of multi-area
+]]></artwork>
+</figure></t>
+</section>
+
+<section anchor="Solution" title="Solution">
+<t>
+  In order to accurately calculate strict RPF in the scenarios of multi-area,
+  it is necessary to expand the type-3 route and advertise the cost in reverse
+  directions between ABR and a prefix at the same time. That is, when R4 advertises
+  the prefix information of R6, it carries cost of 10 and reverse cost of 100
+  at the same time. Similarly, the cost of R6 network prefix information advertised
+  by R5 in two directions is 40 and 50 respectively.
+</t>
+<t>
+  When ABR advertises network Summary LSA (type-3), ABR needs to calculate the
+  total cost from the node where the prefix in LSA is located to this ABR, and
+  advertises it together through protocol extension.
+</t>
+<t>
+  By extending the protocol, R3 can be aware that packets from P6 and P7 will
+  arrive at R3 from R5, so the valid incoming interface of the two protected
+  prefixes can be calculated as intf2.
+</t>
+<t>
+  After the AS is divided into different areas, in order to reduce routing messages,
+  the ABR may aggregate the routing information with the same prefix and only publish
+  one route to other areas. If the forward or reverse path costs of the aggregated
+  prefixes are different, after advertising the aggregated route, the ABR also needs
+  to separately advertise a route for the prefixes with different costs, and advertise
+  the forward and reverse costs corresponding to this prefix in this route.
+</t>
+</section>
+
+<section anchor="Protocol Extension" title="Protocol Extension">
+<section anchor="Extension 1" title="Extension of OSPFv2 Reverse Prefix Cost">
+  <t>
+    A sub-TLV called Prefix-Reverse-cost sub-TLV is defined to carry the total costs
+    from the router where the prefix is located to reach ABR.
+  </t>
+  <t>
+    The Prefix-Reverse-cost Sub-TLV is a sub-TLV of the OSPF Extended Prefix TLV
+    described in <xref target="RFC7684"/>.
+  </t>
+  <t>
+    When the Route Type of OSPFv2 Extended Prefix TLV is Inter-Area (3),
+    Prefix-Reverse-cost sub-TLV can be used.
+  </t>
+  <t>
+    For Multi-Topology support, the TOS field is redefined as MT-ID in the payload of
+    Router, Summary, and Type-5 and Type-7 AS-external LSAs <xref target="RFC4915"/>.
+  </t>
+  <t>
+    It SHOULD appear only once in the parent TLV and has the following format:
+  </t>
+  <t><figure>
+  <artwork align="center" name="Figure 2"><![CDATA[
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|              Type             |             Length            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                      reverse metric                           |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  ]]></artwork>
+  </figure></t>
+  <t>
+    where:
+  </t>
+  <t indent="6">
+    Type:  TBD2.
+  </t>
+  <t indent="6">
+    Length:  4.
+  </t>
+  <t indent="6">
+    Rreverse metric: Total cost value from the router where the prefix is located to ABR.
+  </t>
+</section>
+<section anchor="Extension 2" title="Extension of OSPFv3 Reverse Prefix Cost">
+  <t>
+    A sub-TLV called Prefix-Reverse-cost sub-TLV is defined to carry the total cost
+    from the router where the prefix is located to reach ABR.
+  </t>
+  <t>
+    The Prefix-Reverse-cost sub-TLV is a sub-TLV of the following OSPFv3 TLVs as defined
+    in <xref target="RFC8362"/> and in Section 5:
+  </t>
+  <t indent="6">
+    Inter-Area Prefix TLV
+  </t>
+  <t>
+    It SHOULD appear only once in the parent TLV and has the following format:
+  </t>
+  <t><figure>
+  <artwork align="center" name="Figure 3"><![CDATA[
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|              Type             |             Length            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                     Reverse metric                            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  ]]></artwork>
+  </figure></t>
+  <t>
+    where:
+  </t>
+  <t indent="6">
+    Type:  TBD4.
+  </t>
+  <t indent="6">
+    Length:  4.
+  </t>
+  <t indent="6">
+    Reverse metric: Total cost value from the router where the prefix is located to ABR.
+  </t>
+</section>
+<section anchor="Extension 3" title="Extension of IS-IS Reverse Prefix Cost">
+  <t>
+    A sub-TLV called Prefix-Reverse-cost sub-TLV is defined to carry the total cost
+    from the router where the prefix is located to reach ABR.
+  </t>
+  <t>
+    The Prefix-Reverse-cost sub-TLV is a sub-TLV of the following of the following
+    IS-IS TLVs:
+  </t>
+  <t indent="6">
+    TLV-135 (Extended IPv4 reachability) defined in <xref target="RFC5305"/>.
+  </t>
+  <t indent="6">
+    TLV-235 (Multi-topology IPv4 Reachability) defined in <xref target="RFC5120"/>.
+  </t>
+  <t indent="6">
+    TLV-236 (IPv6 IP Reachability) defined in <xref target="RFC5308"/>.
+  </t>
+  <t indent="6">
+    TLV-237 (Multi-topology IPv6 IP Reachability) defined in <xref target="RFC5120"/>.
+  </t>
+  <t>
+    When the level 2 router leaks routes through the above TLVs, Prefix-Reverse-cost
+    sub-TLV can be used to carry reverse total cost.
+  </t>
+  <t>
+    It SHOULD appear only once in the parent TLV and has the following format:
+  </t>
+  <t><figure>
+  <artwork align="center" name="Figure 4"><![CDATA[
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|   Type        |     Length    |          Reserved             |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       Reverse metric                          | 
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  ]]></artwork>
+  </figure></t>
+  <t>
+    where:
+  </t>
+  <t indent="6">
+    Type:  TBD6.
+  </t>
+  <t indent="6">
+    Length:  6.
+  </t>
+  <t indent="6">
+    Reserved:  SHOULD be set to 0 on transmission and MUST be ignored on reception
+  </t>
+  <t indent="6">
+    Reverse metric: Total cost value from the router where the prefix is located to ABR.
+  </t>
+</section>
+</section>
+
+<section anchor="Security" title="Security Considerations">
+<t>
+  This document describes how OSPF, IS-IS would advertise reverse prefix costs. 
+  There are no new security issues introduced by the extensions in this
+   document. 
+</t>
+<t>
+   As always, if the IS-IS protocol is used in an environment where
+   unauthorized access to the physical links on which IS-IS Protocol
+   Data Units (PDUs) are sent occurs, then attacks are possible.  The
+   use of authentication as defined in [RFC5304] and [RFC5310] is
+   recommended to prevent such attacks.
+</t>
+<t>
+   As always, if the OSPF protocol is used in an environment where
+   unauthorized access to the physical links on which OSPF packets are
+   sent occurs, then attacks are possible.  The use of authentication
+   as defined in [RFC5709], [RFC7474], [RFC4552], and [RFC7166] is
+   recommended for preventing such attacks.
+</t>
+</section>
+
+<section anchor="IANA" title="IANA Considerations">
+<section anchor="IANA-1" title="OSPFv2 Extended Prefix TLV Sub-TLVs Registry">
+  <t>
+    The following values have been allocated:
+  </t>
+  <t><figure>
+  <artwork align="center" name=""><![CDATA[
++-------+--------------------+---------------+
+| Value | Description        | Reference     |
++=======+====================+===============+
+| TBD   | Prefix-Reverse-cost| This document |
++-------+--------------------+---------------+
+
+ Table 1: OSPFv2 Extended Prefix TLV Sub-TLVs
+  ]]></artwork>
+  </figure></t>
+</section>
+<section anchor="IANA-2" title="OSPFv3 Extended-LSA Sub-TLVs Registry">
+  <t>
+    The following values have been allocated:
+  </t>
+  <t><figure>
+  <artwork align="center" name=""><![CDATA[
++-------+--------------------+---------------+
+| Value | Description        | Reference     |
++=======+====================+===============+
+| TBD   | Prefix-Reverse-cost| This document |
++-------+--------------------+---------------+
+
+ Table 2: OSPFv3 Extended Prefix TLV Sub-TLVs
+  ]]></artwork>
+  </figure></t>
+</section>
+<section anchor="IANA-3" title="IS-IS Reverse Prefix Cost Sub-TLV">
+  <t>
+    This document makes the following registrations in the "Sub-TLVs for
+    TLV 135, 235, 236, and 237" registry.
+  </t>
+  <t><figure>
+  <artwork align="center" name=""><![CDATA[
++------+---------------------------+-----+-----+-----+-----+
+| Type | Description               | 135 | 235 | 236 | 237 |
++======+===========================+=====+=====+=====+=====+
+| TBD  |   Prefix-Reverse-cost     |  y  |  y  |  y  |  y  |
++------+---------------------------+-----+-----+-----+-----+
+
+        Table 3: IS-IS Prefix-Reverse-cost Sub-TLVs
+  ]]></artwork>
+  </figure></t>
+</section>
+</section>
+<section anchor="contributors" title="Contributors">
+<t><figure>
+<artwork align="left" name=""><![CDATA[
+Yuanxiang Qiu
+New H3C Technologies
+China
+Email: qiuyuanxiang@h3c.com
+]]></artwork>
+</figure></t>
+</section>
+<!-- <section anchor="Acknowledgements" title="Acknowledgements">
+<t>
+
+</t>
+</section> -->
+
+  </middle>
+  <!--  *****BACK MATTER ***** -->
+
+  <back>
+  <references title="References" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <references title="Normative References">
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.2119.xml"/>
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.2328.xml"/>
+		<xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.4552.xml"/>
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.4915.xml"/>
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.5120.xml"/>
+		<xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.5304.xml"/>
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.5305.xml"/>
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.5308.xml"/>
+		<xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.5310.xml"/>
+	    <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.5709.xml"/>
+		<xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.7166.xml"/>
+		<xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.7474.xml"/>
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.7684.xml"/>
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.8174.xml"/>
+        <xi:include href="http://xml.resource.org/public/rfc/bibxml/reference.RFC.8362.xml"/>
+    </references>
+  </references>
+  </back>
+</rfc>
